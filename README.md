@@ -10,10 +10,11 @@ Built for **ENT Agency**.
 KeHE Email → Parse Brands → Enrich Companies → Find Decision Makers → Find & Verify Emails → Dedup → Personalized Outreach → Follow-Up Sequence
 ```
 
-### 7 Phases, 24 Nodes
+### 8 Phases, 25 Nodes
 
 | Phase | What it does | Tools |
 |-------|-------------|-------|
+| 0. Secrets Fetch | Pulls all API keys from Doppler at runtime | Doppler |
 | 1. Email Ingestion | Watches inbox for KeHE emails, extracts brand names & descriptions | IMAP |
 | 2. Company Enrichment | Finds brand website, enriches company data, filters by ICP | SerpAPI, Apollo.io |
 | 3. Find Decision Makers | Searches LinkedIn for marketing/partnerships contacts | PhantomBuster + LinkedIn Sales Navigator |
@@ -35,11 +36,17 @@ KeHE Email → Parse Brands → Enrich Companies → Find Decision Makers → Fi
 ### 1. Import into n8n
 Workflows → Import from File → select `kehe-lead-gen-workflow.json`
 
-### 2. Environment Variables
-Set these in n8n Settings → Variables:
+### 2. Doppler Secrets Management
+All API keys are fetched at runtime from Doppler. Only **one** n8n environment variable is needed:
 
 | Variable | Source |
 |----------|--------|
+| `DOPPLER_SERVICE_TOKEN` | Doppler → Project → Config → Service Tokens |
+
+All other secrets live in Doppler (`ent-agency-automation` project, `dev` config):
+
+| Doppler Secret | Source |
+|----------------|--------|
 | `SERP_API_KEY` | serpapi.com |
 | `APOLLO_API_KEY` | app.apollo.io → Settings → API |
 | `PHANTOMBUSTER_API_KEY` | phantombuster.com → Settings |
@@ -49,6 +56,8 @@ Set these in n8n Settings → Variables:
 | `SMARTLEAD_CAMPAIGN_ID` | From your Smartlead campaign URL |
 | `SMTP_FROM_EMAIL` | Your outreach sender email |
 | `SMTP_REPLY_TO` | Reply-to email address |
+
+The workflow's "Fetch Secrets from Doppler" node calls `GET /v3/configs/config/secrets/download` at the start of each execution, making all secrets available to downstream nodes.
 
 ### 3. n8n Credentials
 - **IMAP Account** — `marketingteam@nickient.com` inbox

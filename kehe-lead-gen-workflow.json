@@ -23,6 +23,27 @@
     },
     {
       "parameters": {
+        "url": "https://api.doppler.com/v3/configs/config/secrets/download?project=ent-agency-automation&config=dev&format=json",
+        "method": "GET",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.DOPPLER_SERVICE_TOKEN }}" }
+          ]
+        },
+        "options": {
+          "response": { "response": { "fullResponse": false } },
+          "timeout": 10000
+        }
+      },
+      "id": "node-doppler-secrets",
+      "name": "Fetch Secrets from Doppler",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [150, 100]
+    },
+    {
+      "parameters": {
         "jsCode": "// ============================================================\n// PHASE 1: Extract brand names & descriptions from KeHE email\n// Parses HTML body for brand blocks (orange #f07327 headers)\n// ============================================================\n\nconst html = $input.first().json.html || $input.first().json.textHtml || '';\nconst text = $input.first().json.text || $input.first().json.textPlain || '';\nconst subject = $input.first().json.subject || '';\nconst receivedDate = $input.first().json.date || new Date().toISOString();\n\n// Extract brand names from bold orange text in HTML\nconst brandRegex = /<b>([^<]{2,60})<\\/b><\\/span><\\/p>[\\s\\S]*?<span style=\"font-size:16px\">([^<]{20,500})<\\/span>/gi;\nconst brands = [];\nconst seen = new Set();\nlet match;\n\nwhile ((match = brandRegex.exec(html)) !== null) {\n  const name = match[1].trim();\n  const desc = match[2].trim()\n    .replace(/\\u2011/g, '-')\n    .replace(/\\u2019/g, \"'\")\n    .replace(/\\u2018/g, \"'\")\n    .replace(/\\s+/g, ' ');\n  \n  if (!seen.has(name.toLowerCase()) && name.length > 2 && name.length < 60) {\n    seen.add(name.toLowerCase());\n    \n    // Guess category from description\n    let category = 'Consumer Goods';\n    const descLower = desc.toLowerCase();\n    if (descLower.includes('coffee') || descLower.includes('tea') || descLower.includes('beverage') || descLower.includes('drink') || descLower.includes('water') || descLower.includes('soda')) category = 'Food & Beverage';\n    else if (descLower.includes('food') || descLower.includes('snack') || descLower.includes('cookie') || descLower.includes('noodle') || descLower.includes('olive') || descLower.includes('butter') || descLower.includes('chocolate') || descLower.includes('protein')) category = 'Food & Beverage';\n    else if (descLower.includes('pet') || descLower.includes('dog') || descLower.includes('cat')) category = 'Pet Products';\n    else if (descLower.includes('beauty') || descLower.includes('skin') || descLower.includes('hair') || descLower.includes('grooming') || descLower.includes('oral') || descLower.includes('toothpaste')) category = 'Health & Beauty';\n    else if (descLower.includes('supplement') || descLower.includes('vitamin') || descLower.includes('mushroom') || descLower.includes('wellness') || descLower.includes('nutrition') || descLower.includes('fitness')) category = 'Health & Wellness';\n    else if (descLower.includes('household') || descLower.includes('cleaning') || descLower.includes('personal care')) category = 'Household & Personal Care';\n    \n    brands.push({\n      brand_name: name,\n      brand_description: desc,\n      brand_category: category,\n      kehe_email_subject: subject,\n      kehe_feature_date: receivedDate,\n      source: 'KeHE Spotlight Email'\n    });\n  }\n}\n\n// Fallback: parse from plain text if HTML parsing found nothing\nif (brands.length === 0 && text) {\n  const knownBrands = text.match(/^([A-Z][A-Za-z\\s&'.\\-]+?)(?:\\s+is\\s|\\s+are\\s|\\s+delivers|\\s+creates|\\s+crafts|\\s+specializes|\\s+transforms)/gm);\n  if (knownBrands) {\n    for (const line of knownBrands) {\n      const name = line.replace(/\\s+(is|are|delivers|creates|crafts|specializes|transforms).*/, '').trim();\n      if (name.length > 2 && name.length < 60 && !seen.has(name.toLowerCase())) {\n        seen.add(name.toLowerCase());\n        brands.push({\n          brand_name: name,\n          brand_description: '',\n          brand_category: 'Consumer Goods',\n          kehe_email_subject: subject,\n          kehe_feature_date: receivedDate,\n          source: 'KeHE Spotlight Email'\n        });\n      }\n    }\n  }\n}\n\nreturn brands.map(b => ({ json: b }));"
       },
       "id": "node-extract-brands",
@@ -44,7 +65,7 @@
     },
     {
       "parameters": {
-        "url": "=https://serpapi.com/search.json?q={{ encodeURIComponent($json.brand_name) }}+brand+official+site&api_key={{ $env.SERP_API_KEY }}&num=3",
+        "url": "=https://serpapi.com/search.json?q={{ encodeURIComponent($json.brand_name) }}+brand+official+site&api_key={{ $('Fetch Secrets from Doppler').first().json.SERP_API_KEY }}&num=3",
         "method": "GET",
         "options": {
           "response": { "response": { "fullResponse": false } },
@@ -65,7 +86,7 @@
         "headerParameters": {
           "parameters": [
             { "name": "Content-Type", "value": "application/json" },
-            { "name": "X-Api-Key", "value": "={{ $env.APOLLO_API_KEY }}" }
+            { "name": "X-Api-Key", "value": "={{ $('Fetch Secrets from Doppler').first().json.APOLLO_API_KEY }}" }
           ]
         },
         "sendBody": true,
@@ -111,12 +132,12 @@
         "headerParameters": {
           "parameters": [
             { "name": "Content-Type", "value": "application/json" },
-            { "name": "X-Phantombuster-Key", "value": "={{ $env.PHANTOMBUSTER_API_KEY }}" }
+            { "name": "X-Phantombuster-Key", "value": "={{ $('Fetch Secrets from Doppler').first().json.PHANTOMBUSTER_API_KEY }}" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"id\": \"{{ $env.PHANTOMBUSTER_LINKEDIN_AGENT_ID }}\",\n  \"argument\": {\n    \"searches\": [\n      {\n        \"category\": \"people\",\n        \"query\": \"{{ $('Process Each Brand').item.json.brand_name }} marketing director OR VP marketing OR CMO OR brand manager OR influencer marketing OR partnerships\"\n      }\n    ],\n    \"numberOfResults\": 10\n  }\n}",
+        "jsonBody": "={\n  \"id\": \"{{ $('Fetch Secrets from Doppler').first().json.PHANTOMBUSTER_LINKEDIN_AGENT_ID }}\",\n  \"argument\": {\n    \"searches\": [\n      {\n        \"category\": \"people\",\n        \"query\": \"{{ $('Process Each Brand').item.json.brand_name }} marketing director OR VP marketing OR CMO OR brand manager OR influencer marketing OR partnerships\"\n      }\n    ],\n    \"numberOfResults\": 10\n  }\n}",
         "options": {
           "response": { "response": { "fullResponse": false } },
           "timeout": 60000
@@ -146,7 +167,7 @@
         "headerParameters": {
           "parameters": [
             { "name": "Content-Type", "value": "application/json" },
-            { "name": "Authorization", "value": "=Bearer {{ $env.FINDYMAIL_API_KEY }}" }
+            { "name": "Authorization", "value": "=Bearer {{ $('Fetch Secrets from Doppler').first().json.FINDYMAIL_API_KEY }}" }
           ]
         },
         "sendBody": true,
@@ -171,7 +192,7 @@
         "headerParameters": {
           "parameters": [
             { "name": "Content-Type", "value": "application/json" },
-            { "name": "Authorization", "value": "=Bearer {{ $env.FINDYMAIL_API_KEY }}" }
+            { "name": "Authorization", "value": "=Bearer {{ $('Fetch Secrets from Doppler').first().json.FINDYMAIL_API_KEY }}" }
           ]
         },
         "sendBody": true,
@@ -328,7 +349,7 @@
     },
     {
       "parameters": {
-        "url": "=https://server.smartlead.ai/api/v1/campaigns/{{ $env.SMARTLEAD_CAMPAIGN_ID }}/leads?api_key={{ $env.SMARTLEAD_API_KEY }}",
+        "url": "=https://server.smartlead.ai/api/v1/campaigns/{{ $('Fetch Secrets from Doppler').first().json.SMARTLEAD_CAMPAIGN_ID }}/leads?api_key={{ $('Fetch Secrets from Doppler').first().json.SMARTLEAD_API_KEY }}",
         "method": "POST",
         "sendHeaders": true,
         "headerParameters": {
@@ -352,12 +373,12 @@
     },
     {
       "parameters": {
-        "fromEmail": "={{ $env.SMTP_FROM_EMAIL || 'outreach@entagency.com' }}",
+        "fromEmail": "={{ $('Fetch Secrets from Doppler').first().json.SMTP_FROM_EMAIL || 'outreach@entagency.com' }}",
         "toEmail": "={{ $json.contact_email }}",
         "subject": "={{ $json.email_1_subject }}",
         "text": "={{ $json.email_1_body }}",
         "options": {
-          "replyTo": "={{ $env.SMTP_REPLY_TO || 'partnerships@entagency.com' }}"
+          "replyTo": "={{ $('Fetch Secrets from Doppler').first().json.SMTP_REPLY_TO || 'partnerships@entagency.com' }}"
         }
       },
       "id": "node-send-smtp",
@@ -459,12 +480,12 @@
     },
     {
       "parameters": {
-        "fromEmail": "={{ $env.SMTP_FROM_EMAIL || 'outreach@entagency.com' }}",
+        "fromEmail": "={{ $('Fetch Secrets from Doppler').first().json.SMTP_FROM_EMAIL || 'outreach@entagency.com' }}",
         "toEmail": "={{ $json.contact_email }}",
         "subject": "={{ $json.email_2_subject }}",
         "text": "={{ $json.email_2_body }}",
         "options": {
-          "replyTo": "={{ $env.SMTP_REPLY_TO || 'partnerships@entagency.com' }}"
+          "replyTo": "={{ $('Fetch Secrets from Doppler').first().json.SMTP_REPLY_TO || 'partnerships@entagency.com' }}"
         }
       },
       "id": "node-send-followup-1",
@@ -521,12 +542,12 @@
     },
     {
       "parameters": {
-        "fromEmail": "={{ $env.SMTP_FROM_EMAIL || 'outreach@entagency.com' }}",
+        "fromEmail": "={{ $('Fetch Secrets from Doppler').first().json.SMTP_FROM_EMAIL || 'outreach@entagency.com' }}",
         "toEmail": "={{ $json.contact_email }}",
         "subject": "={{ $json.email_3_subject }}",
         "text": "={{ $json.email_3_body }}",
         "options": {
-          "replyTo": "={{ $env.SMTP_REPLY_TO || 'partnerships@entagency.com' }}"
+          "replyTo": "={{ $('Fetch Secrets from Doppler').first().json.SMTP_REPLY_TO || 'partnerships@entagency.com' }}"
         }
       },
       "id": "node-send-followup-2",
@@ -716,7 +737,7 @@
     },
     {
       "parameters": {
-        "content": "## SETUP INSTRUCTIONS\n\n**Environment Variables Required:**\n- SERP_API_KEY — SerpAPI for Google search\n- APOLLO_API_KEY — Apollo.io for company enrichment\n- PHANTOMBUSTER_API_KEY — PhantomBuster for LinkedIn\n- PHANTOMBUSTER_LINKEDIN_AGENT_ID — Your PB agent\n- FINDYMAIL_API_KEY — FindyMail for email finding\n- SMARTLEAD_API_KEY — Smartlead.ai API key\n- SMARTLEAD_CAMPAIGN_ID — Smartlead campaign ID\n- SMTP_FROM_EMAIL — Sender email (for SMTP fallback)\n- SMTP_REPLY_TO — Reply-to email\n\n**n8n Credentials to Configure:**\n1. IMAP Account (for email trigger)\n2. Google Sheets OAuth2 (for lead tracker)\n3. SMTP Account (optional fallback for follow-ups)\n\n**Smartlead Setup:**\n1. Create a campaign in Smartlead with your email sequence\n2. Use custom_fields in templates: {{brand_name}}, {{contact_title}}, {{brand_category}}, {{email_1_body}}, etc.\n3. Set up subsequences in Smartlead for the 3-step sequence\n4. Get your Campaign ID from the Smartlead dashboard URL\n5. Get API key from Settings → API\n\n**Google Sheet Setup:**\nCreate sheet named 'Lead Tracker' with columns:\nbrand_name | brand_description | kehe_feature_date | contact_name | contact_title | contact_email | contact_linkedin | company_website | employee_count | outreach_status | outreach_date | last_updated",
+        "content": "## SETUP INSTRUCTIONS\n\n**Doppler Integration (Secrets Management):**\nAll API keys are fetched at runtime from Doppler.\nOnly ONE n8n environment variable needed:\n- DOPPLER_SERVICE_TOKEN — Your Doppler service token\n\nAll other secrets are stored in Doppler:\n- Project: ent-agency-automation\n- Config: dev\n- Secrets: SERP_API_KEY, APOLLO_API_KEY, PHANTOMBUSTER_API_KEY, PHANTOMBUSTER_LINKEDIN_AGENT_ID, FINDYMAIL_API_KEY, SMARTLEAD_API_KEY, SMARTLEAD_CAMPAIGN_ID, SMTP_FROM_EMAIL, SMTP_REPLY_TO\n\n**n8n Credentials to Configure:**\n1. IMAP Account (for email trigger)\n2. Google Sheets OAuth2 (for lead tracker)\n3. SMTP Account (optional fallback for follow-ups)\n\n**Smartlead Setup:**\n1. Create a campaign in Smartlead with your email sequence\n2. Use custom_fields in templates: {{brand_name}}, {{contact_title}}, {{brand_category}}, {{email_1_body}}, etc.\n3. Set up subsequences in Smartlead for the 3-step sequence\n4. Get your Campaign ID from the Smartlead dashboard URL\n5. Get API key from Settings → API\n\n**Google Sheet Setup:**\nCreate sheet named 'Lead Tracker' with columns:\nbrand_name | brand_description | kehe_feature_date | contact_name | contact_title | contact_email | contact_linkedin | company_website | employee_count | outreach_status | outreach_date | last_updated",
         "height": 580, "width": 450, "color": 5
       },
       "id": "sticky-setup",
@@ -728,6 +749,9 @@
   ],
   "connections": {
     "KeHE Email Trigger (IMAP)": {
+      "main": [[{ "node": "Fetch Secrets from Doppler", "type": "main", "index": 0 }]]
+    },
+    "Fetch Secrets from Doppler": {
       "main": [[{ "node": "Extract Brands from Email", "type": "main", "index": 0 }]]
     },
     "Extract Brands from Email": {
