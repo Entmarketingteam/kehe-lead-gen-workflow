@@ -1,0 +1,272 @@
+{
+  "name": "Smartlead Webhook → Google Sheets Status Sync (ENT Agency)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "smartlead-webhook",
+        "responseMode": "onReceived",
+        "responseData": "allEntries",
+        "options": {}
+      },
+      "id": "node-webhook-trigger",
+      "name": "Smartlead Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 200],
+      "webhookId": "smartlead-webhook-handler"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize the incoming Smartlead webhook payload.\n// Smartlead sends: { event_type, lead_email, campaign_id, ... }\n// Some events nest data differently, so we normalize here.\n\nconst body = $input.first().json.body || $input.first().json;\n\nconst eventType = body.event_type || body.event || '';\nconst leadEmail = body.lead_email || body.email || body.to_email || '';\nconst campaignId = body.campaign_id || '';\nconst leadCategory = body.lead_category || body.category || '';\nconst timestamp = body.timestamp || new Date().toISOString();\n\nreturn [{\n  json: {\n    event_type: eventType,\n    lead_email: leadEmail,\n    campaign_id: String(campaignId),\n    lead_category: leadCategory,\n    timestamp: timestamp,\n    raw: body\n  }\n}];"
+      },
+      "id": "node-normalize-payload",
+      "name": "Normalize Webhook Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [280, 200]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "EMAIL_REPLY",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "EMAIL_REPLY"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "LEAD_CATEGORY_UPDATED",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "LEAD_CATEGORY_UPDATED"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "LEAD_UNSUBSCRIBED",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "LEAD_UNSUBSCRIBED"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "none"
+        }
+      },
+      "id": "node-switch-event",
+      "name": "Route by Event Type",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [560, 200]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1tnv0RcwQ-kLCEBI8YQckNRVcaHnOeavaMDuOfufg5D4"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Lead Tracker"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "contact_email": "={{ $json.lead_email }}",
+            "outreach_status": "replied",
+            "last_updated": "={{ $json.timestamp }}"
+          }
+        },
+        "options": { "cellFormat": "USER_ENTERED" },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "contact_email",
+              "lookupValue": "={{ $json.lead_email }}"
+            }
+          ]
+        }
+      },
+      "id": "node-update-replied",
+      "name": "Update Status → Replied",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [880, 50],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Map Smartlead lead categories to outreach status values.\n// Common Smartlead categories: Interested, Not Interested,\n// Do Not Contact, Information Request, Out of Office, Wrong Person\n\nconst data = $input.first().json;\nconst category = (data.lead_category || '').toLowerCase();\n\nlet status = 'category_updated';\nif (category.includes('interested') && !category.includes('not')) {\n  status = 'interested';\n} else if (category.includes('not interested') || category.includes('do not contact')) {\n  status = 'not_interested';\n} else if (category.includes('out of office') || category.includes('ooo')) {\n  status = 'out_of_office';\n} else if (category.includes('wrong person')) {\n  status = 'wrong_contact';\n} else if (category.includes('information')) {\n  status = 'info_requested';\n}\n\nreturn [{\n  json: {\n    ...data,\n    mapped_status: status\n  }\n}];"
+      },
+      "id": "node-map-category",
+      "name": "Map Category to Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 200]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1tnv0RcwQ-kLCEBI8YQckNRVcaHnOeavaMDuOfufg5D4"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Lead Tracker"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "contact_email": "={{ $json.lead_email }}",
+            "outreach_status": "={{ $json.mapped_status }}",
+            "last_updated": "={{ $json.timestamp }}"
+          }
+        },
+        "options": { "cellFormat": "USER_ENTERED" },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "contact_email",
+              "lookupValue": "={{ $json.lead_email }}"
+            }
+          ]
+        }
+      },
+      "id": "node-update-category",
+      "name": "Update Status → Category",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1200, 200],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1tnv0RcwQ-kLCEBI8YQckNRVcaHnOeavaMDuOfufg5D4"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Lead Tracker"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "contact_email": "={{ $json.lead_email }}",
+            "outreach_status": "unsubscribed",
+            "last_updated": "={{ $json.timestamp }}"
+          }
+        },
+        "options": { "cellFormat": "USER_ENTERED" },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "contact_email",
+              "lookupValue": "={{ $json.lead_email }}"
+            }
+          ]
+        }
+      },
+      "id": "node-update-unsubscribed",
+      "name": "Update Status → Unsubscribed",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [880, 380],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## SMARTLEAD WEBHOOK HANDLER\nReceives webhook events from Smartlead and syncs lead status back to Google Sheets.\n\n**Events handled:**\n- `EMAIL_REPLY` → status = \"replied\"\n- `LEAD_CATEGORY_UPDATED` → maps category (Interested, Not Interested, etc.)\n- `LEAD_UNSUBSCRIBED` → status = \"unsubscribed\"\n\n**Setup:**\n1. Activate this workflow in n8n\n2. Copy the webhook URL (shown in the Webhook Trigger node)\n3. In Smartlead → Campaign Settings → Webhooks → paste the URL\n4. Enable events: EMAIL_REPLY, LEAD_CATEGORY_UPDATED, LEAD_UNSUBSCRIBED\n\n**Google Sheet:** Must match the same sheet used by the main lead gen workflow.",
+        "height": 320, "width": 440, "color": 5
+      },
+      "id": "sticky-instructions",
+      "name": "Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-400, 50]
+    }
+  ],
+  "connections": {
+    "Smartlead Webhook Trigger": {
+      "main": [[{ "node": "Normalize Webhook Payload", "type": "main", "index": 0 }]]
+    },
+    "Normalize Webhook Payload": {
+      "main": [[{ "node": "Route by Event Type", "type": "main", "index": 0 }]]
+    },
+    "Route by Event Type": {
+      "main": [
+        [{ "node": "Update Status → Replied", "type": "main", "index": 0 }],
+        [{ "node": "Map Category to Status", "type": "main", "index": 0 }],
+        [{ "node": "Update Status → Unsubscribed", "type": "main", "index": 0 }]
+      ]
+    },
+    "Map Category to Status": {
+      "main": [[{ "node": "Update Status → Category", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "Smartlead" },
+    { "name": "Webhooks" },
+    { "name": "ENT Agency" },
+    { "name": "Lead Generation" }
+  ],
+  "triggerCount": 1
+}

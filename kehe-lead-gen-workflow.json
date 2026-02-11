@@ -339,7 +339,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// ============================================================\n// PHASE 6: Generate 3 personalized outreach emails\n// Template 1: Initial outreach (KeHE Spotlight hook)\n// Template 2: Follow-up (case study angle)\n// Template 3: Final follow-up (FOMO/scarcity)\n// ============================================================\n\nconst contact = $('Limit to Top 2-3 Contacts').item.json;\nconst email = $('FindyMail - Find Email').item.json.email;\nconst brandName = contact.brand_name;\nconst brandDescription = contact.brand_description;\nconst firstName = contact.first_name;\nconst contactTitle = contact.title;\nconst category = contact.brand_category;\nconst website = contact.company_website;\nconst employeeCount = contact.employee_count;\n\n// Determine the right role-based opener\nlet roleHook = '';\nif (contactTitle.toLowerCase().includes('cmo') || contactTitle.toLowerCase().includes('chief')) {\n  roleHook = 'Given your role steering the marketing vision';\n} else if (contactTitle.toLowerCase().includes('influencer') || contactTitle.toLowerCase().includes('creator') || contactTitle.toLowerCase().includes('partnership')) {\n  roleHook = 'Since you\\'re leading the influencer/partnerships side';\n} else if (contactTitle.toLowerCase().includes('brand manager')) {\n  roleHook = 'As the person closest to the brand\\'s growth';\n} else {\n  roleHook = 'With the marketing momentum you\\'re building';\n}\n\n// Determine category-specific case study reference\nlet caseStudy = '';\nif (category === 'Food & Beverage') {\n  caseStudy = 'We recently helped an emerging kombucha brand generate 2.3M impressions and a 340% increase in retail velocity within 60 days through a targeted micro-influencer campaign across Instagram and TikTok.';\n} else if (category === 'Health & Wellness' || category === 'Health & Beauty') {\n  caseStudy = 'We recently helped a clean beauty brand drive 1.8M impressions and a 280% lift in DTC sales through a strategic influencer seeding campaign with wellness creators on Instagram and TikTok.';\n} else if (category === 'Pet Products') {\n  caseStudy = 'We recently helped a premium pet treat brand generate 1.5M impressions and a 220% increase in Amazon sales through pet influencer partnerships across Instagram, TikTok, and YouTube.';\n} else {\n  caseStudy = 'We recently helped an emerging CPG brand drive 2M+ impressions and a 300% increase in retail velocity within 90 days through strategic influencer partnerships.';\n}\n\n// ===== EMAIL 1: Initial Outreach =====\nconst subject1 = `Congrats on the KeHE Spotlight, ${brandName}!`;\nconst body1 = `Hi ${firstName},\n\nI saw ${brandName} featured as a Spotlight Brand at the 2026 KeHE Summer Show — congrats on the momentum! ${brandDescription ? `\"${brandDescription.substring(0, 120)}...\" really stood out to me.` : 'Really cool to see the traction you\\'re building.'}\n\n${roleHook}, I wanted to reach out because we work specifically with emerging CPG brands in the ${category.toLowerCase()} space to amplify their retail growth through strategic influencer partnerships.\n\nAt ENT Agency, we\\'ve found that brands hitting inflection points like a KeHE Spotlight feature see the biggest ROI from influencer marketing — you\\'ve got the distribution momentum, and creator content is what drives the pull-through at shelf.\n\nWould you be open to a quick 15-minute call to explore if there\\'s a fit? Happy to share some specific ideas for ${brandName}.\n\nBest,\n\n{{sender_name}}\nENT Agency\n{{sender_title}}`;\n\n// ===== EMAIL 2: Follow-Up (Case Study) =====\nconst subject2 = `Quick case study for ${brandName}`;\nconst body2 = `Hi ${firstName},\n\nWanted to circle back with something concrete that might be relevant for ${brandName}.\n\n${caseStudy}\n\nThe playbook we\\'d tailor for ${brandName} would focus on:\n• Identifying 15-30 creators who authentically align with your brand story\n• Seeding product + building genuine relationships (not just one-off posts)\n• Driving both awareness AND measurable retail velocity through strategic content\n\nGiven the KeHE Spotlight feature and your growth trajectory, the timing could be ideal to layer in influencer as a channel.\n\nWorth a quick chat?\n\nBest,\n\n{{sender_name}}\nENT Agency`;\n\n// ===== EMAIL 3: Follow-Up (FOMO/Scarcity) =====\nconst subject3 = `Last thought on ${brandName} + influencer marketing`;\nconst body3 = `Hi ${firstName},\n\nLast note from me — I know your inbox is probably packed.\n\nI\\'ll keep it short: we\\'re currently onboarding Q2 brand partners and have 2-3 spots left for ${category.toLowerCase()} brands. Given ${brandName}\\'s KeHE feature and growth trajectory, it felt like a natural fit.\n\nIf the timing isn\\'t right, no worries at all. But if influencer marketing is on your radar for the next quarter, I\\'d love to have a quick conversation before our calendar fills up.\n\nHere\\'s my Calendly if it\\'s easier to grab a slot directly: {{calendly_link}}\n\nCheers,\n\n{{sender_name}}\nENT Agency`;\n\nreturn [{\n  json: {\n    contact_email: email,\n    contact_first_name: firstName,\n    contact_last_name: contact.last_name,\n    contact_full_name: contact.full_name,\n    contact_title: contactTitle,\n    contact_linkedin: contact.linkedin_url,\n    brand_name: brandName,\n    brand_description: brandDescription,\n    brand_category: category,\n    company_website: website,\n    employee_count: employeeCount,\n    email_1_subject: subject1,\n    email_1_body: body1,\n    email_2_subject: subject2,\n    email_2_body: body2,\n    email_3_subject: subject3,\n    email_3_body: body3,\n    kehe_feature_date: contact.kehe_feature_date\n  }\n}];"
+        "jsCode": "// ============================================================\n// PHASE 6: Generate 3 personalized outreach emails\n// Template 1: Initial outreach (KeHE Spotlight hook)\n// Template 2: Follow-up (case study angle)\n// Template 3: Final follow-up (FOMO/scarcity)\n//\n// All 3 emails are passed to Smartlead as custom fields.\n// Smartlead owns the sequence: sending, delays, warmup,\n// reply detection, and unsubscribe handling.\n// ============================================================\n\nconst contact = $('Limit to Top 2-3 Contacts').item.json;\nconst email = $('FindyMail - Find Email').item.json.email;\nconst brandName = contact.brand_name;\nconst brandDescription = contact.brand_description;\nconst firstName = contact.first_name;\nconst contactTitle = contact.title;\nconst category = contact.brand_category;\nconst website = contact.company_website;\nconst employeeCount = contact.employee_count;\n\n// Determine the right role-based opener\nlet roleHook = '';\nif (contactTitle.toLowerCase().includes('cmo') || contactTitle.toLowerCase().includes('chief')) {\n  roleHook = 'Given your role steering the marketing vision';\n} else if (contactTitle.toLowerCase().includes('influencer') || contactTitle.toLowerCase().includes('creator') || contactTitle.toLowerCase().includes('partnership')) {\n  roleHook = 'Since you\\'re leading the influencer/partnerships side';\n} else if (contactTitle.toLowerCase().includes('brand manager')) {\n  roleHook = 'As the person closest to the brand\\'s growth';\n} else {\n  roleHook = 'With the marketing momentum you\\'re building';\n}\n\n// Determine category-specific case study reference\nlet caseStudy = '';\nif (category === 'Food & Beverage') {\n  caseStudy = 'We recently helped an emerging kombucha brand generate 2.3M impressions and a 340% increase in retail velocity within 60 days through a targeted micro-influencer campaign across Instagram and TikTok.';\n} else if (category === 'Health & Wellness' || category === 'Health & Beauty') {\n  caseStudy = 'We recently helped a clean beauty brand drive 1.8M impressions and a 280% lift in DTC sales through a strategic influencer seeding campaign with wellness creators on Instagram and TikTok.';\n} else if (category === 'Pet Products') {\n  caseStudy = 'We recently helped a premium pet treat brand generate 1.5M impressions and a 220% increase in Amazon sales through pet influencer partnerships across Instagram, TikTok, and YouTube.';\n} else {\n  caseStudy = 'We recently helped an emerging CPG brand drive 2M+ impressions and a 300% increase in retail velocity within 90 days through strategic influencer partnerships.';\n}\n\n// ===== EMAIL 1: Initial Outreach =====\nconst subject1 = `Congrats on the KeHE Spotlight, ${brandName}!`;\nconst body1 = `Hi ${firstName},\n\nI saw ${brandName} featured as a Spotlight Brand at the 2026 KeHE Summer Show — congrats on the momentum! ${brandDescription ? `\"${brandDescription.substring(0, 120)}...\" really stood out to me.` : 'Really cool to see the traction you\\'re building.'}\n\n${roleHook}, I wanted to reach out because we work specifically with emerging CPG brands in the ${category.toLowerCase()} space to amplify their retail growth through strategic influencer partnerships.\n\nAt ENT Agency, we\\'ve found that brands hitting inflection points like a KeHE Spotlight feature see the biggest ROI from influencer marketing — you\\'ve got the distribution momentum, and creator content is what drives the pull-through at shelf.\n\nWould you be open to a quick 15-minute call to explore if there\\'s a fit? Happy to share some specific ideas for ${brandName}.\n\nBest,\n\n{{sender_name}}\nENT Agency\n{{sender_title}}`;\n\n// ===== EMAIL 2: Follow-Up (Case Study) =====\nconst subject2 = `Quick case study for ${brandName}`;\nconst body2 = `Hi ${firstName},\n\nWanted to circle back with something concrete that might be relevant for ${brandName}.\n\n${caseStudy}\n\nThe playbook we\\'d tailor for ${brandName} would focus on:\n• Identifying 15-30 creators who authentically align with your brand story\n• Seeding product + building genuine relationships (not just one-off posts)\n• Driving both awareness AND measurable retail velocity through strategic content\n\nGiven the KeHE Spotlight feature and your growth trajectory, the timing could be ideal to layer in influencer as a channel.\n\nWorth a quick chat?\n\nBest,\n\n{{sender_name}}\nENT Agency`;\n\n// ===== EMAIL 3: Follow-Up (FOMO/Scarcity) =====\nconst subject3 = `Last thought on ${brandName} + influencer marketing`;\nconst body3 = `Hi ${firstName},\n\nLast note from me — I know your inbox is probably packed.\n\nI\\'ll keep it short: we\\'re currently onboarding Q2 brand partners and have 2-3 spots left for ${category.toLowerCase()} brands. Given ${brandName}\\'s KeHE feature and growth trajectory, it felt like a natural fit.\n\nIf the timing isn\\'t right, no worries at all. But if influencer marketing is on your radar for the next quarter, I\\'d love to have a quick conversation before our calendar fills up.\n\nHere\\'s my Calendly if it\\'s easier to grab a slot directly: {{calendly_link}}\n\nCheers,\n\n{{sender_name}}\nENT Agency`;\n\nreturn [{\n  json: {\n    contact_email: email,\n    contact_first_name: firstName,\n    contact_last_name: contact.last_name,\n    contact_full_name: contact.full_name,\n    contact_title: contactTitle,\n    contact_linkedin: contact.linkedin_url,\n    brand_name: brandName,\n    brand_description: brandDescription,\n    brand_category: category,\n    company_website: website,\n    employee_count: employeeCount,\n    email_1_subject: subject1,\n    email_1_body: body1,\n    email_2_subject: subject2,\n    email_2_body: body2,\n    email_3_subject: subject3,\n    email_3_body: body3,\n    kehe_feature_date: contact.kehe_feature_date\n  }\n}];"
       },
       "id": "node-generate-email",
       "name": "Generate Personalized Emails",
@@ -370,29 +370,6 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [4420, -100]
-    },
-    {
-      "parameters": {
-        "fromEmail": "={{ $('Fetch Secrets from Doppler').first().json.SMTP_FROM_EMAIL || 'outreach@entagency.com' }}",
-        "toEmail": "={{ $json.contact_email }}",
-        "subject": "={{ $json.email_1_subject }}",
-        "text": "={{ $json.email_1_body }}",
-        "options": {
-          "replyTo": "={{ $('Fetch Secrets from Doppler').first().json.SMTP_REPLY_TO || 'partnerships@entagency.com' }}"
-        }
-      },
-      "id": "node-send-smtp",
-      "name": "Send Outreach Email (SMTP Fallback)",
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2.1,
-      "position": [4420, 150],
-      "disabled": true,
-      "credentials": {
-        "smtp": {
-          "id": "SMTP_CREDENTIAL_ID",
-          "name": "SMTP Account"
-        }
-      }
     },
     {
       "parameters": {
@@ -431,226 +408,6 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [4740, -100],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_SHEETS_CREDENTIAL_ID",
-          "name": "Google Sheets OAuth2"
-        }
-      }
-    },
-    {
-      "parameters": { "amount": 3, "unit": "days" },
-      "id": "node-wait-3-days",
-      "name": "Wait 3 Days",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [5060, -100],
-      "webhookId": "wait-3-days-webhook"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Check if prospect replied via Smartlead API\n// In production: GET https://server.smartlead.ai/api/v1/campaigns/{id}/leads?api_key=KEY&email=LEAD_EMAIL\n// Check if lead status is 'REPLIED'\nconst emailData = $('Generate Personalized Emails').item.json;\n\n// TODO: Replace with actual Smartlead API call:\n// const response = await fetch(`https://server.smartlead.ai/api/v1/campaigns/${campaignId}/leads?api_key=${apiKey}&email=${emailData.contact_email}`);\n// const lead = await response.json();\n// const hasReplied = lead?.lead_status === 'REPLIED';\n\nreturn [{ json: { ...emailData, has_replied: false, check_timestamp: new Date().toISOString() } }];"
-      },
-      "id": "node-check-reply-1",
-      "name": "Check for Reply (Before FU1)",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [5340, -100]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
-          "conditions": [
-            {
-              "id": "condition-no-reply-1",
-              "leftValue": "={{ $json.has_replied }}",
-              "rightValue": true,
-              "operator": { "type": "boolean", "operation": "notTrue" }
-            }
-          ],
-          "combinator": "and"
-        }
-      },
-      "id": "node-if-no-reply-1",
-      "name": "IF No Reply (Check 1)",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [5620, -100]
-    },
-    {
-      "parameters": {
-        "fromEmail": "={{ $('Fetch Secrets from Doppler').first().json.SMTP_FROM_EMAIL || 'outreach@entagency.com' }}",
-        "toEmail": "={{ $json.contact_email }}",
-        "subject": "={{ $json.email_2_subject }}",
-        "text": "={{ $json.email_2_body }}",
-        "options": {
-          "replyTo": "={{ $('Fetch Secrets from Doppler').first().json.SMTP_REPLY_TO || 'partnerships@entagency.com' }}"
-        }
-      },
-      "id": "node-send-followup-1",
-      "name": "Send Follow-Up #1 (Case Study)",
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2.1,
-      "position": [5940, -200],
-      "credentials": {
-        "smtp": {
-          "id": "SMTP_CREDENTIAL_ID",
-          "name": "SMTP Account"
-        }
-      }
-    },
-    {
-      "parameters": { "amount": 4, "unit": "days" },
-      "id": "node-wait-4-days",
-      "name": "Wait 4 Days",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [6260, -200],
-      "webhookId": "wait-4-days-webhook"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Check if prospect replied via Smartlead API before Follow-Up #2\n// GET https://server.smartlead.ai/api/v1/campaigns/{id}/leads?api_key=KEY&email=LEAD_EMAIL\nconst emailData = $('Generate Personalized Emails').item.json;\n\n// TODO: Replace with actual Smartlead API call (same as Check 1)\nreturn [{ json: { ...emailData, has_replied: false, check_timestamp: new Date().toISOString() } }];"
-      },
-      "id": "node-check-reply-2",
-      "name": "Check for Reply (Before FU2)",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [6540, -200]
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "loose" },
-          "conditions": [
-            {
-              "id": "condition-no-reply-2",
-              "leftValue": "={{ $json.has_replied }}",
-              "rightValue": true,
-              "operator": { "type": "boolean", "operation": "notTrue" }
-            }
-          ],
-          "combinator": "and"
-        }
-      },
-      "id": "node-if-no-reply-2",
-      "name": "IF No Reply (Check 2)",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "position": [6820, -200]
-    },
-    {
-      "parameters": {
-        "fromEmail": "={{ $('Fetch Secrets from Doppler').first().json.SMTP_FROM_EMAIL || 'outreach@entagency.com' }}",
-        "toEmail": "={{ $json.contact_email }}",
-        "subject": "={{ $json.email_3_subject }}",
-        "text": "={{ $json.email_3_body }}",
-        "options": {
-          "replyTo": "={{ $('Fetch Secrets from Doppler').first().json.SMTP_REPLY_TO || 'partnerships@entagency.com' }}"
-        }
-      },
-      "id": "node-send-followup-2",
-      "name": "Send Follow-Up #2 (FOMO/Scarcity)",
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2.1,
-      "position": [7140, -300],
-      "credentials": {
-        "smtp": {
-          "id": "SMTP_CREDENTIAL_ID",
-          "name": "SMTP Account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "update",
-        "documentId": { "__rl": true, "mode": "id", "value": "1tnv0RcwQ-kLCEBI8YQckNRVcaHnOeavaMDuOfufg5D4" },
-        "sheetName": { "__rl": true, "mode": "name", "value": "Lead Tracker" },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "contact_email": "={{ $('Generate Personalized Emails').item.json.contact_email }}",
-            "outreach_status": "sequence_complete",
-            "last_updated": "={{ new Date().toISOString() }}"
-          }
-        },
-        "options": { "cellFormat": "USER_ENTERED" },
-        "filtersUI": {
-          "values": [
-            { "lookupColumn": "contact_email", "lookupValue": "={{ $('Generate Personalized Emails').item.json.contact_email }}" }
-          ]
-        }
-      },
-      "id": "node-update-final-status",
-      "name": "Update Final Status - Sequence Complete",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.5,
-      "position": [7460, -200],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_SHEETS_CREDENTIAL_ID",
-          "name": "Google Sheets OAuth2"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "update",
-        "documentId": { "__rl": true, "mode": "id", "value": "1tnv0RcwQ-kLCEBI8YQckNRVcaHnOeavaMDuOfufg5D4" },
-        "sheetName": { "__rl": true, "mode": "name", "value": "Lead Tracker" },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "contact_email": "={{ $('Generate Personalized Emails').item.json.contact_email }}",
-            "outreach_status": "replied",
-            "last_updated": "={{ new Date().toISOString() }}"
-          }
-        },
-        "options": { "cellFormat": "USER_ENTERED" },
-        "filtersUI": {
-          "values": [
-            { "lookupColumn": "contact_email", "lookupValue": "={{ $('Generate Personalized Emails').item.json.contact_email }}" }
-          ]
-        }
-      },
-      "id": "node-update-replied-1",
-      "name": "Update Status - Replied (Check 1)",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.5,
-      "position": [5940, 50],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "GOOGLE_SHEETS_CREDENTIAL_ID",
-          "name": "Google Sheets OAuth2"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "operation": "update",
-        "documentId": { "__rl": true, "mode": "id", "value": "1tnv0RcwQ-kLCEBI8YQckNRVcaHnOeavaMDuOfufg5D4" },
-        "sheetName": { "__rl": true, "mode": "name", "value": "Lead Tracker" },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "contact_email": "={{ $('Generate Personalized Emails').item.json.contact_email }}",
-            "outreach_status": "replied",
-            "last_updated": "={{ new Date().toISOString() }}"
-          }
-        },
-        "options": { "cellFormat": "USER_ENTERED" },
-        "filtersUI": {
-          "values": [
-            { "lookupColumn": "contact_email", "lookupValue": "={{ $('Generate Personalized Emails').item.json.contact_email }}" }
-          ]
-        }
-      },
-      "id": "node-update-replied-2",
-      "name": "Update Status - Replied (Check 2)",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.5,
-      "position": [7140, -50],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "GOOGLE_SHEETS_CREDENTIAL_ID",
@@ -715,30 +472,19 @@
     },
     {
       "parameters": {
-        "content": "## PHASE 6: PERSONALIZED OUTREACH\nGenerates 3 email templates per contact:\n1. Initial (KeHE Spotlight hook)\n2. Case study follow-up\n3. FOMO/scarcity final follow-up\n\nAdds lead + all 3 email templates to Smartlead campaign.\nSmartlead handles sending, warmup, and deliverability.\n\n**Requires:** SMARTLEAD_API_KEY, SMARTLEAD_CAMPAIGN_ID",
-        "height": 240, "width": 400, "color": 5
+        "content": "## PHASE 6: PERSONALIZED OUTREACH\nGenerates 3 email templates per contact:\n1. Initial (KeHE Spotlight hook)\n2. Case study follow-up\n3. FOMO/scarcity final follow-up\n\nAdds lead + all 3 email templates to Smartlead campaign as custom fields.\n**Smartlead owns the full sequence lifecycle:**\n- Sending schedule & warmup\n- Follow-up delays (Day 1 → Day 3 → Day 7)\n- Reply detection & auto-pause\n- Unsubscribe handling\n- Deliverability optimization\n\nStatus updates flow back via webhook → see `smartlead-webhook-handler.json`\n\n**Requires:** SMARTLEAD_API_KEY, SMARTLEAD_CAMPAIGN_ID",
+        "height": 300, "width": 420, "color": 5
       },
       "id": "sticky-phase6",
       "name": "Phase 6 Note",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [4020, -400]
+      "position": [4020, -450]
     },
     {
       "parameters": {
-        "content": "## PHASE 7: FOLLOW-UP SEQUENCE\nWait 3 days → Check Smartlead for reply → Send FU1\nWait 4 days → Check Smartlead for reply → Send FU2\nUpdate Google Sheets status throughout\n\nIf prospect replies at any point → marks as 'replied' and exits sequence\n\n**Note:** Replace reply check placeholder with Smartlead API call:\nGET /campaigns/{id}/leads?api_key=KEY&email=EMAIL\nCheck lead_status === 'REPLIED'\n\n**Pro tip:** You can also set up Smartlead's built-in subsequences to handle follow-ups automatically — in that case you can simplify Phase 7 to just status tracking.",
-        "height": 240, "width": 420, "color": 7
-      },
-      "id": "sticky-phase7",
-      "name": "Phase 7 Note",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [5260, -400]
-    },
-    {
-      "parameters": {
-        "content": "## SETUP INSTRUCTIONS\n\n**Doppler Integration (Secrets Management):**\nAll API keys are fetched at runtime from Doppler.\nOnly ONE n8n environment variable needed:\n- DOPPLER_SERVICE_TOKEN — Your Doppler service token\n\nAll other secrets are stored in Doppler:\n- Project: ent-agency-automation\n- Config: dev\n- Secrets: SERP_API_KEY, APOLLO_API_KEY, PHANTOMBUSTER_API_KEY, PHANTOMBUSTER_LINKEDIN_AGENT_ID, FINDYMAIL_API_KEY, SMARTLEAD_API_KEY, SMARTLEAD_CAMPAIGN_ID, SMTP_FROM_EMAIL, SMTP_REPLY_TO\n\n**n8n Credentials to Configure:**\n1. IMAP Account (for email trigger)\n2. Google Sheets OAuth2 (for lead tracker)\n3. SMTP Account (optional fallback for follow-ups)\n\n**Smartlead Setup:**\n1. Create a campaign in Smartlead with your email sequence\n2. Use custom_fields in templates: {{brand_name}}, {{contact_title}}, {{brand_category}}, {{email_1_body}}, etc.\n3. Set up subsequences in Smartlead for the 3-step sequence\n4. Get your Campaign ID from the Smartlead dashboard URL\n5. Get API key from Settings → API\n\n**Google Sheet Setup:**\nCreate sheet named 'Lead Tracker' with columns:\nbrand_name | brand_description | kehe_feature_date | contact_name | contact_title | contact_email | contact_linkedin | company_website | employee_count | outreach_status | outreach_date | last_updated",
-        "height": 580, "width": 450, "color": 5
+        "content": "## SETUP INSTRUCTIONS\n\n**Doppler Integration (Secrets Management):**\nAll API keys are fetched at runtime from Doppler.\nOnly ONE n8n environment variable needed:\n- DOPPLER_SERVICE_TOKEN — Your Doppler service token\n\nAll other secrets are stored in Doppler:\n- Project: ent-agency-automation\n- Config: dev\n- Secrets: SERP_API_KEY, APOLLO_API_KEY, PHANTOMBUSTER_API_KEY, PHANTOMBUSTER_LINKEDIN_AGENT_ID, FINDYMAIL_API_KEY, SMARTLEAD_API_KEY, SMARTLEAD_CAMPAIGN_ID\n\n**n8n Credentials to Configure:**\n1. IMAP Account (for email trigger)\n2. Google Sheets OAuth2 (for lead tracker)\n\n**Smartlead Setup:**\n1. Create a campaign with 3-step email sequence:\n   - Step 1: Use {{email_1_subject}} / {{email_1_body}} custom fields\n   - Step 2: 3-day delay, use {{email_2_subject}} / {{email_2_body}}\n   - Step 3: 4-day delay, use {{email_3_subject}} / {{email_3_body}}\n2. Register webhook pointing to your n8n webhook URL\n   - Enable events: EMAIL_REPLY, LEAD_CATEGORY_UPDATED, LEAD_UNSUBSCRIBED\n3. Get Campaign ID from the Smartlead dashboard URL\n4. Get API key from Settings → API\n5. Import `smartlead-webhook-handler.json` as a separate workflow\n\n**Google Sheet Setup:**\nCreate sheet named 'Lead Tracker' with columns:\nbrand_name | brand_description | kehe_feature_date | contact_name | contact_title | contact_email | contact_linkedin | company_website | employee_count | outreach_status | outreach_date | last_updated",
+        "height": 620, "width": 450, "color": 5
       },
       "id": "sticky-setup",
       "name": "Setup Instructions",
@@ -807,39 +553,6 @@
     },
     "Add Lead to Smartlead Campaign": {
       "main": [[{ "node": "Update Status - Outreach Sent", "type": "main", "index": 0 }]]
-    },
-    "Update Status - Outreach Sent": {
-      "main": [[{ "node": "Wait 3 Days", "type": "main", "index": 0 }]]
-    },
-    "Wait 3 Days": {
-      "main": [[{ "node": "Check for Reply (Before FU1)", "type": "main", "index": 0 }]]
-    },
-    "Check for Reply (Before FU1)": {
-      "main": [[{ "node": "IF No Reply (Check 1)", "type": "main", "index": 0 }]]
-    },
-    "IF No Reply (Check 1)": {
-      "main": [
-        [{ "node": "Send Follow-Up #1 (Case Study)", "type": "main", "index": 0 }],
-        [{ "node": "Update Status - Replied (Check 1)", "type": "main", "index": 0 }]
-      ]
-    },
-    "Send Follow-Up #1 (Case Study)": {
-      "main": [[{ "node": "Wait 4 Days", "type": "main", "index": 0 }]]
-    },
-    "Wait 4 Days": {
-      "main": [[{ "node": "Check for Reply (Before FU2)", "type": "main", "index": 0 }]]
-    },
-    "Check for Reply (Before FU2)": {
-      "main": [[{ "node": "IF No Reply (Check 2)", "type": "main", "index": 0 }]]
-    },
-    "IF No Reply (Check 2)": {
-      "main": [
-        [{ "node": "Send Follow-Up #2 (FOMO/Scarcity)", "type": "main", "index": 0 }],
-        [{ "node": "Update Status - Replied (Check 2)", "type": "main", "index": 0 }]
-      ]
-    },
-    "Send Follow-Up #2 (FOMO/Scarcity)": {
-      "main": [[{ "node": "Update Final Status - Sequence Complete", "type": "main", "index": 0 }]]
     }
   },
   "settings": {
