@@ -3,21 +3,29 @@
   "nodes": [
     {
       "parameters": {
-        "mailbox": "INBOX",
-        "postProcessAction": "read",
+        "pollTimes": {
+          "item": [
+            { "mode": "everyMinute" }
+          ]
+        },
+        "filters": {
+          "sender": "marketing@kehe.com",
+          "readStatus": "unread",
+          "q": "from:(@kehe.com) subject:(spotlight OR \"brands on the rise\" OR \"new brands\")"
+        },
         "options": {
-          "customEmailConfig": "['UNSEEN', ['OR', ['FROM', '@marketing.kehe.com'], ['FROM', '@kehe.com']]]"
+          "downloadAttachments": false
         }
       },
       "id": "node-email-trigger",
-      "name": "KeHE Email Trigger (IMAP)",
-      "type": "n8n-nodes-base.emailReadImap",
-      "typeVersion": 2,
+      "name": "Gmail Trigger - KeHE Emails",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.1,
       "position": [0, 100],
       "credentials": {
-        "imap": {
-          "id": "IMAP_CREDENTIAL_ID",
-          "name": "IMAP Account"
+        "gmailOAuth2": {
+          "id": "GMAIL_OAUTH2_CREDENTIAL_ID",
+          "name": "Gmail OAuth2"
         }
       }
     },
@@ -44,7 +52,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// ============================================================\n// PHASE 1: Extract brand names & descriptions from KeHE email\n// Parses HTML body for brand blocks (orange #f07327 headers)\n// ============================================================\n\nconst html = $input.first().json.html || $input.first().json.textHtml || '';\nconst text = $input.first().json.text || $input.first().json.textPlain || '';\nconst subject = $input.first().json.subject || '';\nconst receivedDate = $input.first().json.date || new Date().toISOString();\n\n// Extract brand names from bold orange text in HTML\nconst brandRegex = /<b>([^<]{2,60})<\\/b><\\/span><\\/p>[\\s\\S]*?<span style=\"font-size:16px\">([^<]{20,500})<\\/span>/gi;\nconst brands = [];\nconst seen = new Set();\nlet match;\n\nwhile ((match = brandRegex.exec(html)) !== null) {\n  const name = match[1].trim();\n  const desc = match[2].trim()\n    .replace(/\\u2011/g, '-')\n    .replace(/\\u2019/g, \"'\")\n    .replace(/\\u2018/g, \"'\")\n    .replace(/\\s+/g, ' ');\n  \n  if (!seen.has(name.toLowerCase()) && name.length > 2 && name.length < 60) {\n    seen.add(name.toLowerCase());\n    \n    // Guess category from description\n    let category = 'Consumer Goods';\n    const descLower = desc.toLowerCase();\n    if (descLower.includes('coffee') || descLower.includes('tea') || descLower.includes('beverage') || descLower.includes('drink') || descLower.includes('water') || descLower.includes('soda')) category = 'Food & Beverage';\n    else if (descLower.includes('food') || descLower.includes('snack') || descLower.includes('cookie') || descLower.includes('noodle') || descLower.includes('olive') || descLower.includes('butter') || descLower.includes('chocolate') || descLower.includes('protein')) category = 'Food & Beverage';\n    else if (descLower.includes('pet') || descLower.includes('dog') || descLower.includes('cat')) category = 'Pet Products';\n    else if (descLower.includes('beauty') || descLower.includes('skin') || descLower.includes('hair') || descLower.includes('grooming') || descLower.includes('oral') || descLower.includes('toothpaste')) category = 'Health & Beauty';\n    else if (descLower.includes('supplement') || descLower.includes('vitamin') || descLower.includes('mushroom') || descLower.includes('wellness') || descLower.includes('nutrition') || descLower.includes('fitness')) category = 'Health & Wellness';\n    else if (descLower.includes('household') || descLower.includes('cleaning') || descLower.includes('personal care')) category = 'Household & Personal Care';\n    \n    brands.push({\n      brand_name: name,\n      brand_description: desc,\n      brand_category: category,\n      kehe_email_subject: subject,\n      kehe_feature_date: receivedDate,\n      source: 'KeHE Spotlight Email'\n    });\n  }\n}\n\n// Fallback: parse from plain text if HTML parsing found nothing\nif (brands.length === 0 && text) {\n  const knownBrands = text.match(/^([A-Z][A-Za-z\\s&'.\\-]+?)(?:\\s+is\\s|\\s+are\\s|\\s+delivers|\\s+creates|\\s+crafts|\\s+specializes|\\s+transforms)/gm);\n  if (knownBrands) {\n    for (const line of knownBrands) {\n      const name = line.replace(/\\s+(is|are|delivers|creates|crafts|specializes|transforms).*/, '').trim();\n      if (name.length > 2 && name.length < 60 && !seen.has(name.toLowerCase())) {\n        seen.add(name.toLowerCase());\n        brands.push({\n          brand_name: name,\n          brand_description: '',\n          brand_category: 'Consumer Goods',\n          kehe_email_subject: subject,\n          kehe_feature_date: receivedDate,\n          source: 'KeHE Spotlight Email'\n        });\n      }\n    }\n  }\n}\n\nreturn brands.map(b => ({ json: b }));"
+        "jsCode": "// ============================================================\n// PHASE 1: Extract brand names & descriptions from KeHE email\n// Parses HTML body for brand blocks (orange #f07327 headers)\n// Handles both Gmail Trigger and IMAP node output formats\n// ============================================================\n\nconst item = $input.first().json;\n\n// Gmail Trigger: html is in item.html or item.textHtml\n// IMAP node: html is in item.html or item.textHtml\nconst html = item.html || item.textHtml || '';\nconst text = item.text || item.textPlain || item.snippet || '';\n\n// Gmail Trigger puts subject in item.subject or item.headers?.subject\nconst subject = item.subject || (item.headers && item.headers.subject) || '';\nconst receivedDate = item.date || item.internalDate || new Date().toISOString();\n\n// Extract brand names from bold orange text in HTML\nconst brandRegex = /<b>([^<]{2,60})<\\/b><\\/span><\\/p>[\\s\\S]*?<span style=\"font-size:16px\">([^<]{20,500})<\\/span>/gi;\nconst brands = [];\nconst seen = new Set();\nlet match;\n\nwhile ((match = brandRegex.exec(html)) !== null) {\n  const name = match[1].trim();\n  const desc = match[2].trim()\n    .replace(/\\u2011/g, '-')\n    .replace(/\\u2019/g, \"'\")\n    .replace(/\\u2018/g, \"'\")\n    .replace(/\\s+/g, ' ');\n  \n  if (!seen.has(name.toLowerCase()) && name.length > 2 && name.length < 60) {\n    seen.add(name.toLowerCase());\n    \n    // Guess category from description\n    let category = 'Consumer Goods';\n    const descLower = desc.toLowerCase();\n    if (descLower.includes('coffee') || descLower.includes('tea') || descLower.includes('beverage') || descLower.includes('drink') || descLower.includes('water') || descLower.includes('soda')) category = 'Food & Beverage';\n    else if (descLower.includes('food') || descLower.includes('snack') || descLower.includes('cookie') || descLower.includes('noodle') || descLower.includes('olive') || descLower.includes('butter') || descLower.includes('chocolate') || descLower.includes('protein')) category = 'Food & Beverage';\n    else if (descLower.includes('pet') || descLower.includes('dog') || descLower.includes('cat')) category = 'Pet Products';\n    else if (descLower.includes('beauty') || descLower.includes('skin') || descLower.includes('hair') || descLower.includes('grooming') || descLower.includes('oral') || descLower.includes('toothpaste')) category = 'Health & Beauty';\n    else if (descLower.includes('supplement') || descLower.includes('vitamin') || descLower.includes('mushroom') || descLower.includes('wellness') || descLower.includes('nutrition') || descLower.includes('fitness')) category = 'Health & Wellness';\n    else if (descLower.includes('household') || descLower.includes('cleaning') || descLower.includes('personal care')) category = 'Household & Personal Care';\n    \n    brands.push({\n      brand_name: name,\n      brand_description: desc,\n      brand_category: category,\n      kehe_email_subject: subject,\n      kehe_feature_date: receivedDate,\n      source: 'KeHE Spotlight Email'\n    });\n  }\n}\n\n// Fallback: parse from plain text if HTML parsing found nothing\nif (brands.length === 0 && text) {\n  const knownBrands = text.match(/^([A-Z][A-Za-z\\s&'.\\-]+?)(?:\\s+is\\s|\\s+are\\s|\\s+delivers|\\s+creates|\\s+crafts|\\s+specializes|\\s+transforms)/gm);\n  if (knownBrands) {\n    for (const line of knownBrands) {\n      const name = line.replace(/\\s+(is|are|delivers|creates|crafts|specializes|transforms).*/, '').trim();\n      if (name.length > 2 && name.length < 60 && !seen.has(name.toLowerCase())) {\n        seen.add(name.toLowerCase());\n        brands.push({\n          brand_name: name,\n          brand_description: '',\n          brand_category: 'Consumer Goods',\n          kehe_email_subject: subject,\n          kehe_feature_date: receivedDate,\n          source: 'KeHE Spotlight Email'\n        });\n      }\n    }\n  }\n}\n\nreturn brands.map(b => ({ json: b }));"
       },
       "id": "node-extract-brands",
       "name": "Extract Brands from Email",
@@ -417,7 +425,7 @@
     },
     {
       "parameters": {
-        "content": "## PHASE 1: EMAIL INGESTION\nMonitors inbox for KeHE Spotlight/Brands on the Rise emails.\nParses HTML to extract brand names, descriptions, and categories.\n\n**Requires:** IMAP credentials for your email account",
+        "content": "## PHASE 1: EMAIL INGESTION\nGmail Trigger polls every minute for new KeHE emails.\nFilters: from @kehe.com, subject contains spotlight/brands on the rise.\nParses HTML to extract brand names, descriptions, and categories.\n\n**Requires:** Gmail OAuth2 credential",
         "height": 200, "width": 350, "color": 4
       },
       "id": "sticky-phase1",
@@ -483,7 +491,7 @@
     },
     {
       "parameters": {
-        "content": "## SETUP INSTRUCTIONS\n\n**Doppler Integration (Secrets Management):**\nAll API keys are fetched at runtime from Doppler.\nOnly ONE n8n environment variable needed:\n- DOPPLER_SERVICE_TOKEN — Your Doppler service token\n\nAll other secrets are stored in Doppler:\n- Project: ent-agency-automation\n- Config: dev\n- Secrets: SERP_API_KEY, APOLLO_API_KEY, PHANTOMBUSTER_API_KEY, PHANTOMBUSTER_LINKEDIN_AGENT_ID, FINDYMAIL_API_KEY, SMARTLEAD_API_KEY, SMARTLEAD_CAMPAIGN_ID\n\n**n8n Credentials to Configure:**\n1. IMAP Account (for email trigger)\n2. Google Sheets OAuth2 (for lead tracker)\n\n**Smartlead Setup:**\n1. Create a campaign with 3-step email sequence:\n   - Step 1: Use {{email_1_subject}} / {{email_1_body}} custom fields\n   - Step 2: 3-day delay, use {{email_2_subject}} / {{email_2_body}}\n   - Step 3: 4-day delay, use {{email_3_subject}} / {{email_3_body}}\n2. Register webhook pointing to your n8n webhook URL\n   - Enable events: EMAIL_REPLY, LEAD_CATEGORY_UPDATED, LEAD_UNSUBSCRIBED\n3. Get Campaign ID from the Smartlead dashboard URL\n4. Get API key from Settings → API\n5. Import `smartlead-webhook-handler.json` as a separate workflow\n\n**Google Sheet Setup:**\nCreate sheet named 'Lead Tracker' with columns:\nbrand_name | brand_description | kehe_feature_date | contact_name | contact_title | contact_email | contact_linkedin | company_website | employee_count | outreach_status | outreach_date | last_updated",
+        "content": "## SETUP INSTRUCTIONS\n\n**Doppler Integration (Secrets Management):**\nAll API keys are fetched at runtime from Doppler.\nOnly ONE n8n environment variable needed:\n- DOPPLER_SERVICE_TOKEN — Your Doppler service token\n\nAll other secrets are stored in Doppler:\n- Project: ent-agency-automation\n- Config: dev\n- Secrets: SERP_API_KEY, APOLLO_API_KEY, PHANTOMBUSTER_API_KEY, PHANTOMBUSTER_LINKEDIN_AGENT_ID, FINDYMAIL_API_KEY, SMARTLEAD_API_KEY, SMARTLEAD_CAMPAIGN_ID\n\n**n8n Credentials to Configure:**\n1. Gmail OAuth2 (for email trigger — same Google account)\n2. Google Sheets OAuth2 (for lead tracker)\n\n**Smartlead Setup:**\n1. Create a campaign with 3-step email sequence:\n   - Step 1: Use {{email_1_subject}} / {{email_1_body}} custom fields\n   - Step 2: 3-day delay, use {{email_2_subject}} / {{email_2_body}}\n   - Step 3: 4-day delay, use {{email_3_subject}} / {{email_3_body}}\n2. Register webhook pointing to your n8n webhook URL\n   - Enable events: EMAIL_REPLY, LEAD_CATEGORY_UPDATED, LEAD_UNSUBSCRIBED\n3. Get Campaign ID from the Smartlead dashboard URL\n4. Get API key from Settings → API\n5. Import `smartlead-webhook-handler.json` as a separate workflow\n\n**Google Sheet Setup:**\nCreate sheet named 'Lead Tracker' with columns:\nbrand_name | brand_description | kehe_feature_date | contact_name | contact_title | contact_email | contact_linkedin | company_website | employee_count | outreach_status | outreach_date | last_updated",
         "height": 620, "width": 450, "color": 5
       },
       "id": "sticky-setup",
@@ -494,7 +502,7 @@
     }
   ],
   "connections": {
-    "KeHE Email Trigger (IMAP)": {
+    "Gmail Trigger - KeHE Emails": {
       "main": [[{ "node": "Fetch Secrets from Doppler", "type": "main", "index": 0 }]]
     },
     "Fetch Secrets from Doppler": {

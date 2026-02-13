@@ -24,7 +24,7 @@ KeHE Email → Parse Brands → Enrich Companies → Find Decision Makers → Fi
 | Phase | What it does | Tools |
 |-------|-------------|-------|
 | 0. Secrets Fetch | Pulls all API keys from Doppler at runtime | Doppler |
-| 1. Email Ingestion | Watches inbox for KeHE emails, extracts brand names & descriptions | IMAP |
+| 1. Email Ingestion | Gmail trigger polls for KeHE emails, extracts brand names & descriptions | Gmail OAuth2 |
 | 2. Company Enrichment | Finds brand website, enriches company data, filters by ICP | SerpAPI, Apollo.io |
 | 3. Find Decision Makers | Searches LinkedIn for marketing/partnerships contacts | PhantomBuster + LinkedIn Sales Navigator |
 | 4. Email Finding | Finds and verifies contact email addresses | FindyMail |
@@ -78,7 +78,7 @@ All other secrets live in Doppler (`ent-agency-automation` project, `dev` config
 The workflow's "Fetch Secrets from Doppler" node calls `GET /v3/configs/config/secrets/download` at the start of each execution, making all secrets available to downstream nodes.
 
 ### 3. n8n Credentials
-- **IMAP Account** — `marketingteam@nickient.com` inbox
+- **Gmail OAuth2** — `marketingteam@nickient.com` (used for email trigger; can share the same Google OAuth2 app as Sheets)
 - **Google Sheets OAuth2** — for Lead Tracker access (used by both workflows)
 
 ### 4. Google Sheet
